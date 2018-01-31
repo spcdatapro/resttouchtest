@@ -463,6 +463,22 @@ function traduceDetalleComanda(dc, dict) {
     return detalle;
 }
 
+function conteoProductos(det) {
+    var conteo = 0;
+
+    if (det) {
+        det.forEach(function(item){
+            try{
+                if (item.idproducto.trim() != '') {
+                    conteo++;
+                }
+            }catch(e){ }
+        });
+    }
+
+    return conteo;
+}
+
 function traduceFormasPago(dp, emisores) {
     let detalle = [], str = '';
     dp.forEach((fp) => {
@@ -504,7 +520,7 @@ function listaComandasRestaurante(req, res) {
                     res.status(200).send({ mensaje: 'No se encontro nada en el diccionario de fox.' });
                 } else {
                     const diccionario = dictfox;
-                    Comanda.find({ idestatuscomanda: "59fea7304218672b285ab0e2", debaja: false }, null, { sort: { fecha: 1 } })
+                    Comanda.find({ idestatuscomanda: { $in: ["59fea7304218672b285ab0e2", "5a72403fc5bb328b700edc58"] }, debaja: false }, null, { sort: { fecha: 1 } })
                         .populate('idcliente', ['_id', 'nombre'])
                         .populate('idtipocomanda', ['_id', 'descripcion', 'imagen'])
                         .populate('idusuario', ['_id', 'nombre'])
@@ -536,7 +552,11 @@ function listaComandasRestaurante(req, res) {
                                                 };
                                             }
 
+                                            var tmpDetalle = [], cantDetalle = 0;
+
                                             if (rst.idrestaurante._id.toString().trim() === idrestaurante.toString().trim()) {
+                                                tmpDetalle = traduceDetalleComanda(rst.detallecomanda, diccionario);
+                                                cantDetalle = conteoProductos(tmpDetalle);
                                                 lst.push({
                                                     fechahora: moment(rst.fecha, 'YYYY-MM-DD HH:mm:ss').format('DD/MM/YYYY HH:mm:ss'),
                                                     tracking: parseInt(rst.tracking),
@@ -554,7 +574,8 @@ function listaComandasRestaurante(req, res) {
                                                     restaurante: rst.idrestaurante ? rst.idrestaurante.nombre : rst.iddireccioncliente.idrestaurante.nombre,
                                                     idtipocomanda: rst.idtipocomanda._id,
                                                     tipocomanda: rst.idtipocomanda.descripcion,
-                                                    detalle: traduceDetalleComanda(rst.detallecomanda, diccionario),
+                                                    detalle: tmpDetalle,
+                                                    cantidadlineasdetalle: cantDetalle,
                                                     detalleformapago: traduceFormasPago(rst.detcobrocomanda, listaet),
                                                     facturara: traduceFacturarA(rst.detfacturara[0])
                                                 });
@@ -617,6 +638,10 @@ function getComandaByTracking(req, res) {
                                                 };
                                             }
 
+                                            var tmpDetalle = [], cantDetalle = 0;
+                                            tmpDetalle = traduceDetalleComanda(rst.detallecomanda, diccionario);
+                                            cantDetalle = conteoProductos(tmpDetalle);
+
                                             lst.push({
                                                 fechahora: moment(rst.fecha, 'YYYY-MM-DD HH:mm:ss').format('DD/MM/YYYY HH:mm:ss'),
                                                 tracking: parseInt(rst.tracking),
@@ -634,7 +659,8 @@ function getComandaByTracking(req, res) {
                                                 restaurante: rst.idrestaurante ? rst.idrestaurante.nombre : rst.iddireccioncliente.idrestaurante.nombre,
                                                 idtipocomanda: rst.idtipocomanda._id,
                                                 tipocomanda: rst.idtipocomanda.descripcion,
-                                                detalle: traduceDetalleComanda(rst.detallecomanda, diccionario),
+                                                detalle: tmpDetalle,
+                                                cantidadlineasdetalle: cantDetalle,
                                                 detalleformapago: traduceFormasPago(rst.detcobrocomanda, listaet),
                                                 facturara: traduceFacturarA(rst.detfacturara[0])
                                             });                                            
@@ -655,6 +681,22 @@ function getComandaByTracking(req, res) {
         });
     });
 
+}
+
+function comandaConProblemas(req, res){
+    var idcom = req.params.id;
+
+    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "5a72403fc5bb328b700edc58" }, { new: true }, (err, comandaUpd) => {
+        if (err) {
+            res.status(500).send({ mensaje: 'Error en el servidor al poner la comanda en Problemas.' });
+        } else {
+            if (!comandaUpd) {
+                res.status(200).send({ mensaje: 'No se pudo poner con problema para descargar la comanda.' });
+            } else {
+                res.status(200).send({ mensaje: 'Comanda puesta con problemas para descargar.', entidad: comandaUpd });
+            }
+        }
+    });
 }
 
 function confirmarComanda(req, res){
@@ -1190,7 +1232,7 @@ module.exports = {
     crearComanda, modificarComanda, eliminarComanda, listaComandas, getComanda, lstComandasCliente, contadorPorEstatus, lstComandasUsuario, listaComandasPost,
     // api para FOX
     listaComandasRestaurante, confirmarComanda, resetEstatusComandas, cobroAprobadoComanda, cobroRechazadoComanda,
-    produccionComanda, enCaminoComanda, entregadaComanda, confirmarComandaEncargado, getComandaByTracking,
+    produccionComanda, enCaminoComanda, entregadaComanda, confirmarComandaEncargado, getComandaByTracking, comandaConProblemas,
     // fin de api para FOX    
     crearDetComanda, modificarDetComanda, eliminarDetComanda, listaDetComanda, getDetComanda,
     crearDetCompDetComanda, modificarDetCompDetComanda, eliminarDetCompDetComanda, listaDetCompDetComanda, getDetCompDetComanda,

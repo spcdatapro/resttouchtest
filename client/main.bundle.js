@@ -817,7 +817,7 @@ var ListadoClientesComponent = /** @class */ (function () {
 /***/ "../../../../../src/app/components/clock/clock.component.html":
 /***/ (function(module, exports) {
 
-module.exports = "<span class=\"font-weight-bold\" style=\"font-size: 20pt\">\r\n    {{time | date:'dd/MM/yyyy HH:mm:ss' }} (vBeta)\r\n</span>\r\n"
+module.exports = "<span class=\"font-weight-bold\" style=\"font-size: 20pt\">\r\n    {{time | date:'dd/MM/yyyy HH:mm:ss' }} (vPruebas)\r\n</span>\r\n"
 
 /***/ }),
 
