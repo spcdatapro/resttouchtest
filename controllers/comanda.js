@@ -1,5 +1,6 @@
 'use strict'
 
+var mongoose = require('mongoose');
 var moment = require('moment');
 
 // Modelos
@@ -37,7 +38,8 @@ function crearComanda(req, res){
     com.idrestaurante = params.idrestaurante;
     com.idmotorista = params.idmotorista;
     com.imgpago = params.imgpago;
-    com.debaja = params.debaja;    
+    com.debaja = params.debaja;   
+    com.bitacoraestatus = [ { idestatuscomanda: mongoose.Types.ObjectId("59fea7304218672b285ab0e2"), estatus: "Pendiente", fecha: moment().toDate() } ];
 
     com.save((err, comandaSvd) => {
         if (err) {
@@ -469,7 +471,7 @@ function conteoProductos(det) {
     if (det) {
         det.forEach(function(item){
             try{
-                if (+item.idproducto > 0) {
+                if (item.idproducto.trim() != '') {
                     conteo++;
                 }
             }catch(e){ }
@@ -577,7 +579,8 @@ function listaComandasRestaurante(req, res) {
                                                     detalle: tmpDetalle,
                                                     cantidadlineasdetalle: cantDetalle,
                                                     detalleformapago: traduceFormasPago(rst.detcobrocomanda, listaet),
-                                                    facturara: traduceFacturarA(rst.detfacturara[0])
+                                                    facturara: traduceFacturarA(rst.detfacturara[0]),
+                                                    bitacoraestatus: rst.bitacoraestatus
                                                 });
                                             }
                                         } catch (errTry) {
@@ -662,7 +665,8 @@ function getComandaByTracking(req, res) {
                                                 detalle: tmpDetalle,
                                                 cantidadlineasdetalle: cantDetalle,
                                                 detalleformapago: traduceFormasPago(rst.detcobrocomanda, listaet),
-                                                facturara: traduceFacturarA(rst.detfacturara[0])
+                                                facturara: traduceFacturarA(rst.detfacturara[0]),
+                                                bitacoraestatus: rst.bitacoraestatus
                                             });                                            
                                         } catch (errTry) {
                                             errores.push(errTry);
@@ -683,10 +687,38 @@ function getComandaByTracking(req, res) {
 
 }
 
+function setBody(idestatus){
+    var descripcion = '';
+
+    switch (idestatus) {
+        case "59fea7304218672b285ab0e2": descripcion = "Pendiente"; break;
+        case "59fea7524218672b285ab0e3": descripcion = "Recibido en restaurante"; break;
+        case "5a512f55228d627facf8c643": descripcion = "Confirmado por encargado"; break;
+        case "59fea7894218672b285ab0e4": descripcion = "Cobrado - aprobado"; break;
+        case "59fea79e4218672b285ab0e5": descripcion = "Cobrado - rechazado"; break;
+        case "59fea7bc4218672b285ab0e6": descripcion = "Producción"; break;
+        case "59fea7dd4218672b285ab0e7": descripcion = "En camino"; break;
+        case "59fea7f34218672b285ab0e8": descripcion = "Entregado"; break;
+        case "5a72403fc5bb328b700edc58": descripcion = "Error al recibir en restaurante"; break;
+    }
+
+    return {
+        idestatuscomanda: idestatus,
+        $push: {
+            'bitacoraestatus': {
+                fecha: moment().toDate(),
+                idestatuscomanda: mongoose.Types.ObjectId(idestatus),
+                estatus: descripcion
+            }
+        }
+    };
+}
+
 function comandaConProblemas(req, res){
     var idcom = req.params.id;
+    var body = setBody("5a72403fc5bb328b700edc58");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "5a72403fc5bb328b700edc58" }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({ mensaje: 'Error en el servidor al poner la comanda en Problemas.' });
         } else {
@@ -701,10 +733,11 @@ function comandaConProblemas(req, res){
 
 function confirmarComanda(req, res){
     var idcom = req.params.id;
+    var body = setBody("59fea7524218672b285ab0e3");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "59fea7524218672b285ab0e3"}, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
-            res.status(500).send({ mensaje: 'Error en el servidor al confirmar la comanda.' });
+            res.status(500).send({ mensaje: 'Error en el servidor al confirmar la comanda. ERROR: ' + err });
         } else {
             if (!comandaUpd) {
                 res.status(200).send({ mensaje: 'No se pudo confirmar la comanda.' });
@@ -717,8 +750,9 @@ function confirmarComanda(req, res){
 
 function confirmarComandaEncargado(req, res) {
     var idcom = req.params.id;
+    var body = setBody("5a512f55228d627facf8c643");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "5a512f55228d627facf8c643" }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({
                 mensaje: 'Error en el servidor al confirmar la comanda por el encargado.'
@@ -750,8 +784,9 @@ function resetEstatusComandas(req, res) {
 
 function cobroAprobadoComanda(req, res) {
     var idcom = req.params.id;
+    var body = setBody("59fea7894218672b285ab0e4");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "59fea7894218672b285ab0e4" }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({ mensaje: 'Error en el servidor al cambiar el estatus a cobro aprobado de la comanda.' });
         } else {
@@ -766,8 +801,9 @@ function cobroAprobadoComanda(req, res) {
 
 function cobroRechazadoComanda(req, res) {
     var idcom = req.params.id;
+    var body = setBody("59fea79e4218672b285ab0e5");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "59fea79e4218672b285ab0e5" }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({ mensaje: 'Error en el servidor al cambiar el estatus a cobro rechazado de la comanda.' });
         } else {
@@ -782,8 +818,9 @@ function cobroRechazadoComanda(req, res) {
 
 function produccionComanda(req, res) {
     var idcom = req.params.id;
+    var body = setBody("59fea7bc4218672b285ab0e6");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "59fea7bc4218672b285ab0e6" }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({ mensaje: 'Error en el servidor al cambiar el estatus a produción de la comanda.' });
         } else {
@@ -798,8 +835,10 @@ function produccionComanda(req, res) {
 
 function enCaminoComanda(req, res) {
     var idcom = req.params.id, idmotorista = req.params.idmotorista;
+    var body = setBody("59fea7dd4218672b285ab0e7");
+    body.idmotorista = idmotorista;
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "59fea7dd4218672b285ab0e7", idmotorista: idmotorista }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({ mensaje: 'Error en el servidor al cambiar el estatus a en camino de la comanda.' });
         } else {
@@ -814,8 +853,9 @@ function enCaminoComanda(req, res) {
 
 function entregadaComanda(req, res) {
     var idcom = req.params.id;
+    var body = setBody("59fea7f34218672b285ab0e8");
 
-    Comanda.findByIdAndUpdate(idcom, { idestatuscomanda: "59fea7f34218672b285ab0e8" }, { new: true }, (err, comandaUpd) => {
+    Comanda.findByIdAndUpdate(idcom, body, { new: true }, (err, comandaUpd) => {
         if (err) {
             res.status(500).send({ mensaje: 'Error en el servidor al cambiar el estatus a comanda entregada.' });
         } else {
